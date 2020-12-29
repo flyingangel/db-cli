@@ -10,7 +10,9 @@ source shell_modules/shell-lib/autoload.sh
 
 log.warning "Make sure to run this script with sudo"
 
-uninstall_binary "db"
-uninstall_manpage "db-cli.1.gz"
+{
+    uninstall_binary "db"
+    uninstall_manpage "db-cli.1.gz"
+} || log.error "Error" true
 
-log.success "DONE"
+log.finish "DONE"

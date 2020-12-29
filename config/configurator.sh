@@ -77,7 +77,7 @@ function main() {
         echo "$template" >"$2"
     fi
 
-    echo
+    log.newline
 }
 
 main "template.config.ini" "config.ini"

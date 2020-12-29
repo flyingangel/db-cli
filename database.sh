@@ -4,6 +4,7 @@
 # ======
 
 #set working dir
+CURRENT_DIR=$(pwd -P)
 DIR_ROOT=$(dirname -- "$(realpath "$0")")
 cd "$DIR_ROOT" || exit 1
 source config/autoload.sh
@@ -38,7 +39,6 @@ function dispatcher() {
     esac
 }
 
-# helper
 function man() {
     log.header "-- DB-CLI --"
     log.header "Hash: $(git branch) #$(git rev-parse --short HEAD)"
@@ -79,7 +79,7 @@ function database_drop() {
 }
 
 function database_export() {
-    local file size
+    local file size remoteArg
     local remote="localhost"
     local port=22
 
@@ -90,6 +90,7 @@ function database_export() {
     for i in "$@"; do
         case $i in
         --file=*) file="${i#*=}" ;;
+        --remote-arg=*) remoteArg="${i#*=}" ;;
         --remote*) remote="${i#*=}" ;;
         -*) shift ;; #unknown params with dash
         *) POSITIONAL+=("$i") ;;
@@ -105,7 +106,7 @@ function database_export() {
 
     #export at current location
     if [[ $file == "." ]]; then
-        file=$(pwd -P)/$date.$1.sql.gz
+        file=$CURRENT_DIR/$date.$1.sql.gz
     fi
 
     #if output file is not specified
@@ -118,6 +119,8 @@ function database_export() {
             file=$dir/$file
         fi
     fi
+
+    file=$(realpath "$file")
 
     #export from localhost
     if [ "$remote" == "localhost" ]; then
@@ -145,7 +148,8 @@ function database_export() {
         #remote value is not localhost ask for server
         if [ "$remote" == "--remote" ]; then
             log.newline
-            mysql.remote.ask_server remote port
+            mysql.remote.ask_server remote
+            log.newline
         fi
 
         if [ -z "$remote" ]; then
@@ -153,26 +157,32 @@ function database_export() {
             exit 1
         fi
 
-        log.newline
         log.info "Exporting remote DB $1 from $remote"
 
-        mysql.remote.export "$file" "$remote" "$port" "$REMOTE_SSH_USER" "$1" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD"
+        if ! mysql.remote.request_auth; then
+            log.warning "Invalid authentification"
+            exit 1
+        fi
+
+        timer.start
+
+        mysql.remote.export "$file" "$remote" "$port" "$REMOTE_SSH_USER" "$1" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD" "$remoteArg"
 
         #check file size
         file.size.readable size "$file"
 
         #check error
-        if [ "$size" == "0 Kb" ]; then
-            log.error "Problem with export or connecting to remote server"
+        if [[ "$size" == 0* ]]; then
+            log.error "Error"
             exit 1
         else
-            log.success "DONE $file ($size)"
+            log.success "DONE $file ($size) ($(timer.end)s)"
         fi
     fi
 }
 
 function database_import() {
-    local file realfile
+    local file realfile remoteArg
     local remote="localhost"
     local port=22
 
@@ -183,6 +193,7 @@ function database_import() {
     for i in "$@"; do
         case $i in
         --file=*) file="${i#*=}" ;;
+        --remote-arg=*) remoteArg="${i#*=}" ;;
         --remote*) remote="${i#*=}" ;;
         -*) shift ;; #unknown params with dash
         *) POSITIONAL+=("$i") ;;
@@ -192,11 +203,10 @@ function database_import() {
     set -- "${POSITIONAL[@]}"
 
     helper.request_db_param "$1"
+    mysql.request_auth
 
     #import from localhost
     if [ "$remote" == "localhost" ]; then
-        mysql.request_auth
-
         #if input file is not specified
         if [ -z "$file" ]; then
             backup.get_backup_dir dir "$1"
@@ -204,8 +214,12 @@ function database_import() {
             #if db dir exist get file from db dir
             if [ -n "$dir" ]; then
                 file=$dir/$(ls "$dir" | tail -n 1)
-                file=$(realpath "$file")
             fi
+        fi
+
+        #input file not exist because of relative path
+        if [[ ! -f $file && -f $CURRENT_DIR/$file ]]; then
+            file=$(realpath "$CURRENT_DIR/$file")
         fi
 
         #check file exist
@@ -228,7 +242,7 @@ function database_import() {
         #remote value is not localhost ask for server
         if [ "$remote" == "--remote" ]; then
             log.newline
-            mysql.remote.ask_server remote port
+            mysql.remote.ask_server remote
             log.newline
         fi
 
@@ -237,9 +251,14 @@ function database_import() {
             exit 1
         fi
 
+        if ! mysql.remote.request_auth; then
+            log.warning "Invalid authentification"
+            exit 1
+        fi
+
         timer.start
-        
-        if mysql.remote.import "$remote" "$port" "$REMOTE_SSH_USER" "$1" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD" "$CFG_DB_USER" "$CFG_DB_PASSWORD"; then
+
+        if mysql.remote.import "$remote" "$port" "$REMOTE_SSH_USER" "$1" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD" "$remoteArg"; then
             log.success "DONE ($(timer.end)s)"
         else
             log.error "Error"

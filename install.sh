@@ -15,10 +15,12 @@ source shell_modules/shell-lib/autoload.sh
 
 log.warning "Make sure to run this script with sudo"
 
-install_binary "$(realpath database.sh)" "db"
-install_manpage man/manpage.1.gz db-cli.1.gz
+{
+    install_binary "$(realpath database.sh)" "db"
+    install_manpage man/manpage.1.gz db-cli.1.gz
+} || log.error "Error" true
 
 log.info "Running configurator"
 ./config/configurator.sh
 
-log.success "DONE"
+log.finish "DONE"

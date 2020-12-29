@@ -8,7 +8,7 @@ db-cli - Database CLI
 
 # SYNOPSIS
 
-**db** [_OPTIONS_] [_COMMAND_]
+**db** [*OPTIONS*] [*COMMAND*]
 
 # DESCRIPTION
 
@@ -21,33 +21,37 @@ Database tools for CLI
 
 # COMMAND
 
-**ba [_SUBDIR_], backupall [_SUBDIR_]**
+**ba [*SUBDIR*], backupall [*SUBDIR*]**
 : backup all database; if subDir is specified, put all backups in this sub-directory
 
-**c _DATABASE_, create _DATABASE_**
+**c [*DATABASE*], create [*DATABASE*]**
 : create a database
 
-**copy _DATABASE-SOURCE_ _DATABASE-DESTINATION_**
+**copy [*DATABASE-SOURCE*] [*DATABASE-DESTINATION*]**
 : copy a database to another database, create new if not exists
 
-**d _DATABASE_, delete _DATABASE_, drop _DATABASE_**
+**d [*DATABASE*], delete [*DATABASE*], drop [*DATABASE*]**
 : delete a database
 
-**e _DATABASE_ [_OPT_], export _DATABASE_ [_OPT_]**
+**e [*DATABASE*] [*OPT*], export [*DATABASE*] [*OPT*]**
 : export a database
 
 > **--file**=/path/to/file
 
-> > specifying an export file instead of exporting to the backup folder; --file="." will put the file in the current folder
+> > specifying an export file instead of exporting to the backup folder; **--file="."** will put the file in the current folder
 
 > **--remote**[=IP]
 
-> > export from a remote location instead of localhost; if no IP is specified, use a preconfigured list
+> > export from a remote location instead of localhost; if no IP is specified, the host list is read from **/etc/hosts**
 
-**exec _SQL_ [_DATABASE_]**
+> **--remote-arg**=ARGS
+
+> > additional mysql args to pass to remote server
+
+**exec *SQL* [*DATABASE*]**
 : restore a database chosen from a list of backup files
 
-**i _DATABASE_ [_OPT_], import _DATABASE_ [_OPT_]**
+**i [*DATABASE*] [*OPT*], import [*DATABASE*] [*OPT*]**
 : import a database
 
 > **--file**=/path/to/file
@@ -56,7 +60,11 @@ Database tools for CLI
 
 > **--remote**[=IP]
 
-> > import from a remote location instead of localhost; if no IP is specified, use a preconfigured list
+> > import from a remote location instead of localhost; if no IP is specified, the host list is read from **/etc/hosts**
+
+> **--remote-arg**=ARGS
+
+> > additional mysql args to pass to remote server
 
 **l, list**
 : list databases
@@ -64,7 +72,7 @@ Database tools for CLI
 **ls, listsize**
 : list databases and their size
 
-**r _DATABASE_, restore _DATABASE_**
+**r [*DATABASE*], restore [*DATABASE*]**
 : restore a database chosen from a list of backup files
 
 # EXAMPLES
@@ -73,15 +81,19 @@ Database tools for CLI
 
 **db** l | **db** list
 
-**db** i _DATABASE_ | **db** import _DATABASE_ --file=/path/to/file
+**db** i [*DATABASE*]
 
-**db** i _DATABASE_ --remote
+**db** import [*DATABASE*] --file=/path/to/file
 
-**db** i _DATABASE_ --remote="1.1.1.1"
+**db** i [*DATABASE*] --remote
+
+**db** i [*DATABASE*] --remote="1.1.1.1" --remote-arg="-h 2.2.2.2"
+
+**db** export [*DATABASE*] --file="."
 
 **db** exec "SHOW DATABASES"
 
-**db** exec "SHOW TABLES" _DATABASE_
+**db** exec "SHOW TABLES" [*DATABASE*]
 
 # SEE ALSO
 

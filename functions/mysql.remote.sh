@@ -1,132 +1,117 @@
 #!/bin/bash
 
 #export sql from remote server
-#mysql.remote.export target_file ip port ssh_user db_name db_user db_pw
+#mysql.remote.export target_file ip port ssh_user db_name db_user db_pw remote_mysql_args
 function mysql.remote.export() {
+    local file=$1
+    local ip=$2
     local port=$3
     local ssh_user=$4
     local db_name=$5
     local db_user=$6
     local db_pass=$7
+    local args=$8
 
-    if [ -z "$1" ]; then
-        exit 1
-    fi
+    set -o pipefail
 
-    mysql.remote.request_auth "$port" "$ssh_user" "$db_name" "$db_user" "$db_pass"
-    #final check for fatal error
-    if ! mysql.remote.check_auth "$port" "$ssh_user" "$db_name" "$db_user" "$db_pass"; then
-        log.warning "Invalid authentification"
-        return 1
-    fi
+    ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" >"$file"
 
-    ssh -p "$port" "$ssh_user@$2" "mysqldump --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" >"$1"
+    #shellcheck disable=SC2181
+    [[ $? -eq 0 ]] || return 1
 }
 
 #import sql from remote server
-#mysql.remote.import ip port ssh_user db_name remote_db_user remote_db_pw local_db_user local_db_pw
+#mysql.remote.import ip port ssh_user db_name remote_db_user remote_db_pw remote_arg remote_mysql_args
 function mysql.remote.import() {
+    local ip=$1
     local port=$2
     local ssh_user=$3
     local db_name=$4
     local db_user=$5
     local db_pass=$6
-
-    mysql.remote.request_auth "$port" "$ssh_user" "$db_name" "$db_user" "$db_pass"
-    #final check for fatal error
-    if ! mysql.remote.check_auth "$port" "$ssh_user" "$db_name" "$db_user" "$db_pass"; then
-        log.warning "Invalid authentification"
-        return 1
-    fi
+    local args=$7
 
     log.info "Importing $db_name from $1"
 
     #delete then create destination
-    mysql.drop "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$4"
-    mysql.create "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$4"
+    mysql.drop "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$db_name"
+    mysql.create "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$db_name"
 
     set -o pipefail
 
     #import from remote server
-    if [ -z "$8" ]; then
-        ssh -p "$port" "$ssh_user@$1" "mysqldump --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$7" "$db_name"
+    if [ -z "$CFG_DB_PASSWORD" ]; then
+        ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$CFG_DB_USER" "$db_name"
     else
-        ssh -p "$port" "$ssh_user@$1" "mysqldump --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$7" -p"$8" "$db_name"
+        ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$db_name"
     fi
+
+    #shellcheck disable=SC2181
+    [[ $? -eq 0 ]] || return 1
 }
 
 #request auth when importing from remote
 #mysql.remote.request_auth
 function mysql.remote.request_auth() {
-    if [ -z "$port" ]; then
-        port=22
-    fi
-
     #empty ssh user
-    if [ -z "$ssh_user" ]; then
-        read -rp "Enter SSH username of remote server: " ssh_user
-    fi
-
-    #empty database name
-    if [ -z "$db_name" ]; then
-        read -rp "Enter the database name to export: " db_name
+    if [ -z "$REMOTE_SSH_USER" ]; then
+        input.read REMOTE_SSH_USER "Enter SSH username of remote server: "
     fi
 
     #empty mysql user
-    if [ -z "$db_user" ]; then
-        read -rp "Enter remote mysql username: " db_user
+    if [ -z "$REMOTE_DB_USER" ]; then
+        input.read REMOTE_DB_USER "Enter remote mysql username: " REMOTE_DB_USER
     fi
 
     #empty mysql pw
-    if [ -z "$db_pass" ]; then
-        input.read_secret db_pass "Enter remote mysql password: "
+    if [ -z "$REMOTE_DB_PASSWORD" ]; then
+        input.read_secret REMOTE_DB_PASSWORD "Enter remote mysql password: "
     fi
-}
 
-#check if auth is correct
-#mysql.remote.check_auth
-function mysql.remote.check_auth() {
-    mysql.remote.request_auth "$port" "$ssh_user" "$db_name" "$db_user" "$db_pass"
-
-    #final check
-    if [[ -z "$port" || -z "$ssh_user" || -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
+    #final check for fatal error
+    if [[ -z $REMOTE_SSH_USER || -z $REMOTE_DB_USER || -z $REMOTE_DB_PASSWORD ]]; then
         return 1
     fi
 }
 
-#list remote server defined in config.ini
-#mysql.remote.list_server
-function mysql.remote.list_server() {
-    local list i
-
-    echo -e "#\tHost\tDescription"
-    list=$(printf '%s' "$SERVERLIST" | awk -F "\t" '{print $1"\t"$2}')
-    i=1
-    echo "$list" | while read -r line; do
-        echo -e "$i\t$line"
-        ((i++))
-    done
-}
-
 #return a chosen server IP
-#mysql.remote.ask_server result_ip result_port
+#mysql.remote.ask_server result_ip
 function mysql.remote.ask_server() {
-    local input ip p
+    local input ip list i host hostList
 
-    mysql.remote.list_server
-    echo
+    list=$(printf '%s' "$(cat /etc/hosts)" | awk -F "\\\s+" '{print $1"\t"$2}')
+    i=0
+    hostList=()
 
-    read -p "Choose a server number: " input
+    log.header "#\tIP\t\tHost"
 
-    #conver number to IP
-    ip=$(printf '%s' "$SERVERLIST" | awk -F "\t" -v i="$input" 'FNR == i {print $1}')
-    p=$(printf '%s' "$SERVERLIST" | awk -F "\t" -v i="$input" 'FNR == i {print $3}')
+    while read -r line; do
+        #test for valid IP
+        if [[ $line =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+            ip=$(printf '%s' "$line" | awk -F "\t" '{print $1}')
 
-    #invalid
-    if [ -z "$ip" ]; then
+            if [[ $ip == "127.0.0.1" ]]; then
+                continue
+            fi
+
+            echo -e "$i\t$line"
+
+            hostList+=("$ip")
+            ((i++))
+        fi
+    done < <(echo "$list")
+
+    log.newline
+
+    read -rp "Choose a server number: " input
+
+    #test if is a number
+    if ! [[ "$input" =~ ^[0-9]+$ ]]; then
+        log.error "Invalid number"
         exit 1
     fi
 
-    eval "$1=$ip"
-    eval "$2=$p"
+    host="${hostList[$input]}"
+
+    eval "$1=$host"
 }

@@ -21,17 +21,7 @@ Exemple of some commands :
     db import [database_name]
     db delete [database_name]
 
-### Configuring remote server for import and export operation
-
-In `config/config.ini` file, configure a tab-seperated array
-
-    #   Host    Description Port
-    SERVERLIST=$(cat <<'EOF'
-        X.X.X.X "My server" 1234
-    EOF
-    )
-
-The default port is `22` and is optional
+To configure remote server for import and export operation, edit hosts list `/etc/hosts`
 
 ## Uninstall
 
