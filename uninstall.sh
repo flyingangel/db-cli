@@ -13,6 +13,6 @@ log.warning "Make sure to run this script with sudo"
 {
     uninstall_binary "db"
     uninstall_manpage "db-cli.1.gz"
-} || log.error "Error" true
+} || log.fatal "Error" true
 
 log.finish "DONE"
