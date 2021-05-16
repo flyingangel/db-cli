@@ -14,9 +14,9 @@ function mysql.exec() {
 #mysql.exec_full db_user db_pwd sql db_name
 function mysql.exec_full() {
     if [ -z "$2" ]; then
-        mysql -v -v -v -u "$1" -e "$3;" "$4"
+        mysql -vvv -u "$1" -e "$3;" "$4"
     else
-        mysql -v -v -v -u "$1" -p"$2" -e "$3;" "$4"
+        mysql -vvv -u "$1" -p"$2" -e "$3;" "$4"
     fi
 }
 
@@ -24,9 +24,9 @@ function mysql.exec_full() {
 #mysql.exec_silent db_user db_pwd sql db_name
 function mysql.exec_silent() {
     if [ -z "$2" ]; then
-        mysql -s -N -u "$1" -e "$3;"
+        mysql -sN -u "$1" -e "$3;"
     else
-        mysql -s -N -u "$1" -p"$2" -e "$3;"
+        mysql -sN -u "$1" -p"$2" -e "$3;"
     fi
 }
 
@@ -34,23 +34,31 @@ function mysql.exec_silent() {
 #mysql.export db_user db_pwd db_name
 function mysql.export() {
     local file="$3.sql.gz"
+    local password
 
     #custom filename
     if [ -n "$4" ]; then
         file="$4"
     fi
 
-    if [ -z "$2" ]; then
-        mysqldump --single-transaction -u "$1" "$3" | gzip --best >"$file"
+    password=$([[ -n $2 ]] && echo "-p$2")
+
+    #detect if pv command exist
+    if [[ -t 1 && -n $(which pv) ]]; then
+        mysqldump --single-transaction -u "$1" "$password" "$3" | pv -W -D 1 | gzip --best  >"$file"
     else
-        mysqldump --single-transaction -u "$1" -p"$2" "$3" | gzip --best >"$file"
+        mysqldump --single-transaction -u "$1" "$password" "$3" | gzip --best >"$file"
     fi
+
+    #shellcheck disable=SC2181
+    [[ $? -eq 0 ]] || return 1
 }
 
 #Import database
 #mysql_import db_user db_pwd db_name
-function mysql_database_import() {
+function mysql.import() {
     local file="$3.sql"
+    local password
 
     #custom filename
     if [ -n "$4" ]; then
@@ -60,11 +68,17 @@ function mysql_database_import() {
     mysql.drop "$1" "$2" "$3"
     mysql.create "$1" "$2" "$3"
 
-    if [ -z "$2" ]; then
-        mysql -u "$1" "$3" <"$file"
+    password=$([[ -n $2 ]] && echo "-p$2")
+
+    #detect if pv command exist
+    if [[ -t 1 && -n $(which pv) ]]; then
+        pv -D 1 "$file" | mysql -u "$1" "$password" "$3"
     else
-        mysql -u "$1" -p"$2" "$3" <"$file"
+        mysql -u "$1" "$password" "$3" <"$file"
     fi
+
+    #shellcheck disable=SC2181
+    [[ $? -eq 0 ]] || return 1
 }
 
 #List all database

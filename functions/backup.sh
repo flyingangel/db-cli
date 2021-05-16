@@ -7,7 +7,7 @@ function backup.get_backup_dir() {
 
     #if backup folder is defined
     if [ -n "$CFG_DB_DIR_BACKUP" ]; then
-        #create folder if noexist
+        #create folder if not exist
         if [ ! -d "$CFG_DB_DIR_BACKUP" ]; then
             mkdir -p "$CFG_DB_DIR_BACKUP"
         fi
@@ -51,30 +51,23 @@ function backup.get_tmp_dir() {
 }
 
 #List backup files
-#backup.list result
+#backup.list result dbName
 function backup.list() {
-    local f dir i count input file_list target
+    local dir count input files file_list target
     backup.get_backup_dir dir "$2"
-
 
     #if backup folder exist
     if [ -d "$dir" ]; then
-        count=$(ls -1q $dir/* | wc -l)
+        count=$(ls -1q $dir | wc -l)
         log.info "Found $count backups"
         log.newline
 
-        file_list=()
-        i=0
-
-        #shellcheck disable=SC2045
-        for f in $(ls -r $dir); do
-            echo -e "$i\t$f"
-            file_list+=("$(realpath "$dir/$f")")
-            ((i++))
-        done
+        files=$(ls -r "$dir")
+        echo "$files" | nl
+        mapfile -t file_list <<< "$files"
 
         log.newline
-        printf "To restore a version, select a number (default 0): "
+        printf "To restore a version, select a number (default 1): "
         read -r input
         log.newline
 
@@ -83,6 +76,7 @@ function backup.list() {
             exit 1
         fi
 
+        [[ $input -gt 1 ]] && ((input--))
         target="${file_list[$input]}"
 
         eval "$1=$target"

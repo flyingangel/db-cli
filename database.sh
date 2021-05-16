@@ -69,7 +69,7 @@ function database_drop() {
     log.header "Deleting database $1"
     helper.request_db_param "$1"
 
-    if input.askcontinue "Are you sur you want to delete the database \"$1\" ?"; then
+    if input.askcontinue "Are you sure you want to delete the database \"$1\" ?"; then
         mysql.request_auth
         mysql.drop "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$1"
         log.success "Database $1 deleted"
@@ -202,6 +202,16 @@ function database_import() {
     #restore positional parameters
     set -- "${POSITIONAL[@]}"
 
+    if [[ -z $1 ]]; then
+        log.info "Usage: db i [dbName]"
+        log.info "List of existing backups"
+
+        log.newline
+        backup.get_backup_dir dir
+        ls "$dir" | nl
+        log.newline
+    fi
+
     helper.request_db_param "$1"
     mysql.request_auth
 
@@ -213,29 +223,41 @@ function database_import() {
 
             #if db dir exist get file from db dir
             if [ -n "$dir" ]; then
-                file=$dir/$(ls "$dir" | tail -n 1)
+                lastFile=$(ls "$dir" | tail -n 1)
+
+                if [[ -n $lastFile ]]; then
+                    file=$dir/$(ls "$dir" | tail -n 1)
+                fi
             fi
         fi
 
         #input file not exist because of relative path
-        if [[ ! -f $file && -f $CURRENT_DIR/$file ]]; then
+        if [[ -n $file && ! -f $file && -f $CURRENT_DIR/$file ]]; then
             file=$(realpath "$CURRENT_DIR/$file")
         fi
 
-        #check file exist
-        helper.get_dump realfile "$file"
-
-        if [ ! -f "$realfile" ]; then
-            if [ ! -f "$realfile" ]; then
-                log.error "File $realfile does not exist"
-                exit 1
-            fi
+        if [[ $file =~ \.gz$ || $file =~ \.zip$ ]]; then
+            log.info "Unzipping $file"
         fi
 
+        helper.get_dump realfile "$file"
+
+        if [[ -z $realfile ]]; then
+            log.error "Input file not specified or not found in backup dir $dir"
+            exit 1
+        fi
+
+        if [ ! -f "$realfile" ]; then
+            log.error "File $realfile does not exist"
+            exit 1
+        fi
+
+        file.size.readable size "$file"
+
         #begin import
-        log.info "Importing DB $1 from $file"
+        log.info "Importing DB $1 from $file ($size)"
         timer.start
-        mysql_database_import "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$1" "$realfile"
+        mysql.import "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$1" "$realfile"
         log.success "DONE ($(timer.end)s)"
 
     else
@@ -250,6 +272,8 @@ function database_import() {
             log.error "Remote server is not set"
             exit 1
         fi
+
+        log.info "Importing remote DB $1 from $remote"
 
         if ! mysql.remote.request_auth; then
             log.warning "Invalid authentification"

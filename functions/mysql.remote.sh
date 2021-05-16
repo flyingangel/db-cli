@@ -80,21 +80,23 @@ function mysql.remote.ask_server() {
     local input ip list i host hostList
 
     list=$(printf '%s' "$(cat /etc/hosts)" | awk -F "\\\s+" '{print $1"\t"$2}')
-    i=0
+    i=1
     hostList=()
 
-    log.header "#\tIP\t\tHost"
+    log.header "$(printf '   %-15s\t%-30s\t%s\n' 'IP' 'Host' '#')"
 
     while read -r line; do
         #test for valid IP
         if [[ $line =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
             ip=$(printf '%s' "$line" | awk -F "\t" '{print $1}')
+            host=$(printf '%s' "$line" | awk -F "\t" '{print $2}')
 
             if [[ $ip == "127.0.0.1" ]]; then
                 continue
             fi
 
-            echo -e "$i\t$line"
+            printf '   %-15s\t%-30s\t%s\n' "$ip" "$host" "$i"
+            # printf '%60s' "$line" && echo -e "\t$line"
 
             hostList+=("$ip")
             ((i++))
@@ -111,6 +113,7 @@ function mysql.remote.ask_server() {
         exit 1
     fi
 
+    [[ $input -gt 1 ]] && ((input--))
     host="${hostList[$input]}"
 
     eval "$1=$host"

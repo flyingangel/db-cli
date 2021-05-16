@@ -60,7 +60,7 @@ function helper.get_dump() {
 function helper.request_db_param() {
     local param_number=2
 
-    if [ -n "$2" ]; then
+    if [[ -v 2 && -n "$2" ]]; then
         param_number=$2
     fi
 
