@@ -96,7 +96,6 @@ function mysql.remote.ask_server() {
             fi
 
             printf '   %-15s\t%-30s\t%s\n' "$ip" "$host" "$i"
-            # printf '%60s' "$line" && echo -e "\t$line"
 
             hostList+=("$ip")
             ((i++))
