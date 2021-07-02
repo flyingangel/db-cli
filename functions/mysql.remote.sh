@@ -112,7 +112,7 @@ function mysql.remote.ask_server() {
         exit 1
     fi
 
-    [[ $input -gt 1 ]] && ((input--))
+    [[ $input -ge 0 ]] && ((input--))
     host="${hostList[$input]}"
 
     eval "$1=$host"
