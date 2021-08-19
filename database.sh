@@ -236,6 +236,10 @@ function database_import() {
             file=$(realpath "$CURRENT_DIR/$file")
         fi
 
+        if [[ -f $file ]]; then
+            file=$(realpath "$file")
+        fi
+
         if [[ $file =~ \.gz$ || $file =~ \.zip$ ]]; then
             log.info "Unzipping $file"
         fi
