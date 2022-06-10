@@ -27,6 +27,9 @@ Database tools for CLI
 **c [*DATABASE*], create [*DATABASE*]**
 : create a database
 
+**cleartmp**
+: clear tmp folder of db-cli
+
 **copy [*DATABASE-SOURCE*] [*DATABASE-DESTINATION*]**
 : copy a database to another database, create new if not exists
 

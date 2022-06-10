@@ -32,6 +32,7 @@ function dispatcher() {
     "r" | "restore") database_restore "$@" ;;
     "copy") database_copy "$@" ;;
     "exec") database_exec "$@" ;;
+    "cleartmp") database_cleartmp "$@" ;;
     *)
         log.fatal "$1" "ERROR Unknown command"
         man
@@ -118,6 +119,11 @@ function database_export() {
         if [ -n "$dir" ]; then
             file=$dir/$file
         fi
+    fi
+
+    # Relative path
+    if [[ $file != /* ]]; then
+        file="$CURRENT_DIR/$file"
     fi
 
     file=$(realpath "$file")
@@ -428,6 +434,13 @@ function database_backup_all() {
             log.info ">> $file ($size)"
         fi
     done
+}
+
+function database_cleartmp()
+{
+    if [[ -d $DIR_ROOT/runtime/tmp ]]; then
+        rm -f "$DIR_ROOT"/runtime/tmp/*.sql
+    fi
 }
 
 # ========
