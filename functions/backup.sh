@@ -23,6 +23,11 @@ function backup.get_backup_dir() {
             backup=$backup/$2
         fi
 
+        #begin with .
+        if [[ $backup == .* ]]; then
+            backup=$(realpath "$backup")
+        fi
+
         eval "$1=$backup"
         return 0
     fi

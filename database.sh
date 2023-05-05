@@ -416,8 +416,6 @@ function database_backup_all() {
             done
         fi
 
-        exit
-
         #dump DB if not ignored
         if ! $ignore; then
             log.info "Backing up DB $db"
@@ -436,11 +434,12 @@ function database_backup_all() {
     done
 }
 
-function database_cleartmp()
-{
+function database_cleartmp() {
     if [[ -d $DIR_ROOT/runtime/tmp ]]; then
         rm -f "$DIR_ROOT"/runtime/tmp/*.sql
     fi
+
+    echo "Tmp DB cleared"
 }
 
 # ========
