@@ -1,3 +1,4 @@
 [submodule "shell_modules/shell-lib"]
 	path = shell_modules/shell-lib
 	url = https://github.com/flyingangel/shell-lib.git
+	branch = master
