@@ -45,9 +45,9 @@ function mysql.export() {
 
     #detect if pv command exist
     if [[ -t 1 && -n $(which pv) ]]; then
-        mysqldump --single-transaction -u "$1" "$password" "$3" | pv -W -D 1 | gzip --best  >"$file"
+        mysqldump --single-transaction --routines --events -u "$1" "$password" "$3" | pv -W -D 1 | gzip --best  >"$file"
     else
-        mysqldump --single-transaction -u "$1" "$password" "$3" | gzip --best >"$file"
+        mysqldump --single-transaction --routines --events -u "$1" "$password" "$3" | gzip --best >"$file"
     fi
 
     #shellcheck disable=SC2181

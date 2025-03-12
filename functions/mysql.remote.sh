@@ -14,7 +14,7 @@ function mysql.remote.export() {
 
     set -o pipefail
 
-    ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" >"$file"
+    ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction --routines --events -u $db_user -p$db_pass $db_name | gzip --best" >"$file"
 
     #shellcheck disable=SC2181
     [[ $? -eq 0 ]] || return 1
@@ -41,9 +41,9 @@ function mysql.remote.import() {
 
     #import from remote server
     if [ -z "$CFG_DB_PASSWORD" ]; then
-        ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$CFG_DB_USER" "$db_name"
+        ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction --routines --events -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$CFG_DB_USER" "$db_name"
     else
-        ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$db_name"
+        ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction --routines --events -u $db_user -p$db_pass $db_name | gzip --best" | gunzip | mysql -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$db_name"
     fi
 
     #shellcheck disable=SC2181
