@@ -44,7 +44,7 @@ function backup.get_tmp_dir() {
     #guess where the backup folder is
     if [ -n "$CFG_DB_DIR_TMP" ]; then
         if [ ! -d "$CFG_DB_DIR_TMP" ]; then
-            mkdir "$CFG_DB_DIR_TMP"
+            mkdir -p "$CFG_DB_DIR_TMP"
         fi
 
         dir=$CFG_DB_DIR_TMP
@@ -63,7 +63,7 @@ function backup.list() {
 
     #if backup folder exist
     if [ -d "$dir" ]; then
-        count=$(ls -1q $dir | wc -l)
+        count=$(ls -1q "$dir" | wc -l)
         log.info "Found $count backups"
         log.newline
 
