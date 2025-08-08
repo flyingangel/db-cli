@@ -83,7 +83,7 @@ function mysql.remote.ask_server() {
     i=1
     hostList=()
 
-    log.header "$(printf '   %-15s\t%-30s\t%s\n' 'IP' 'Host' '#')"
+    log.header "$(printf '%s\t%-16s\t%s\n' '#' 'IP' 'Host')"
 
     while read -r line; do
         #test for valid IP
@@ -95,7 +95,7 @@ function mysql.remote.ask_server() {
                 continue
             fi
 
-            printf '   %-15s\t%-30s\t%s\n' "$ip" "$host" "$i"
+            printf '%s\t%-16s\t%s\n' "$i" "$ip" "$host"
 
             hostList+=("$ip")
             ((i++))
