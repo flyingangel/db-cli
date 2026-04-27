@@ -8,7 +8,11 @@ cd "$DIR_ROOT" || exit 1
 #load external lib
 source shell_modules/shell-lib/autoload.sh
 
-log.warning "Make sure to run this script with sudo"
+if ! right.is_root; then
+    log.error "Sudo permission is required to install the binary"
+
+    exit 1
+fi
 
 {
     uninstall_binary "db"

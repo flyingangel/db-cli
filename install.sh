@@ -13,7 +13,11 @@ fi
 #load external lib
 source shell_modules/shell-lib/autoload.sh
 
-log.warning "Make sure to run this script with sudo"
+if ! right.is_root; then
+    log.error "Sudo permission is required to install the binary"
+
+    exit 1
+fi
 
 log.info "Running configurator"
 ./config/configurator.sh
