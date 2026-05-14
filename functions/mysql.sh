@@ -31,23 +31,20 @@ function mysql.exec_silent() {
 }
 
 #Export database
-#mysql.export db_user db_pwd db_name
+#mysql.export db_user db_pwd db_name output_file
 function mysql.export() {
     local file="$3.sql.gz"
-    local password
 
     #custom filename
     if [ -n "$4" ]; then
         file="$4"
     fi
 
-    password=$([[ -n $2 ]] && echo "-p$2")
-
     #detect if pv command exist
-    if [[ -t 1 && -n $(which pv) ]]; then
-        mysqldump --single-transaction --routines --events -u "$1" "$password" "$3" | pv -W -D 1 | gzip --best  >"$file"
+    if [[ -t 1 ]] && command -v pv >/dev/null; then
+        mysqldump --single-transaction --routines --events -u "$1" -p"$2" "$3" | pv -W -D 1 | file.gzip --best >"$file"
     else
-        mysqldump --single-transaction --routines --events -u "$1" "$password" "$3" | gzip --best >"$file"
+        mysqldump --single-transaction --routines --events -u "$1" -p"$2" "$3" | file.gzip --best >"$file"
     fi
 
     #shellcheck disable=SC2181
@@ -57,24 +54,15 @@ function mysql.export() {
 #Import database
 #mysql_import db_user db_pwd db_name
 function mysql.import() {
-    local file="$3.sql"
-    local password
-
-    #custom filename
-    if [ -n "$4" ]; then
-        file=$4
-    fi
-
     mysql.drop "$1" "$2" "$3"
     mysql.create "$1" "$2" "$3"
 
-    password=$([[ -n $2 ]] && echo "-p$2")
-
-    #detect if pv command exist
-    if [[ -t 1 && -n $(which pv) ]]; then
-        pv -D 1 "$file" | mysql -u "$1" "$password" "$3"
+    if [[ -t 1 ]] && command -v pv >/dev/null; then
+        # shellcheck disable=SC2086
+        file.stream "$4" | pv -D 1 | mysql -u "$1" -p"$2" "$3"
     else
-        mysql -u "$1" "$password" "$3" <"$file"
+        # shellcheck disable=SC2086
+        file.stream "$4" | mysql -u "$1" -p"$2" "$3"
     fi
 
     #shellcheck disable=SC2181
@@ -130,7 +118,7 @@ function mysql.request_auth() {
     fi
 
     #if password is not set
-    if [[ ! -v CFG_DB_PASSWORD ]]; then
+    if [[ -z $CFG_DB_PASSWORD ]]; then
         mysql.request_password CFG_DB_PASSWORD
     fi
 }

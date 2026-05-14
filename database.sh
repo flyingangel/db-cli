@@ -1,4 +1,6 @@
 #!/bin/bash
+# shellcheck disable=SC2086
+
 # ======
 # DB-CLI
 # ======
@@ -84,8 +86,6 @@ function database_export() {
     local remote="localhost"
     local port=22
 
-    log.header "Export database $1"
-
     #opts
     POSITIONAL=()
     for i in "$@"; do
@@ -100,20 +100,23 @@ function database_export() {
     #restore positional parameters
     set -- "${POSITIONAL[@]}"
 
-    helper.request_db_param "$1"
+    local dbName=$1
+
+    log.header "Export database $dbName"
+    helper.request_db_param "$dbName"
 
     date.datetime date true
     date=${date//:/-}
 
     #export at current location
     if [[ $file == "." ]]; then
-        file=$CURRENT_DIR/$date.$1.sql.gz
+        file=$CURRENT_DIR/$date.$dbName.sql.gz
     fi
 
     #if output file is not specified
     if [ -z "$file" ]; then
-        backup.get_backup_dir dir "$1"
-        file=$date.$1.sql.gz
+        backup.get_backup_dir dir "$dbName"
+        file=$date.$dbName.sql.gz
 
         #if db dir exist put file in db dir
         if [ -n "$dir" ]; then
@@ -132,23 +135,23 @@ function database_export() {
     if [ "$remote" == "localhost" ]; then
         mysql.request_auth
 
-        if ! (mysql.exist "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$1"); then
-            log.error "Database $1 not exist"
+        if ! (mysql.exist "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$dbName"); then
+            log.error "Database $dbName not exist"
             exit 1
         fi
 
-        log.info "Exporting DB $1"
-        mysql.export "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$1" "$file"
+        log.info "Exporting DB $dbName"
+        mysql.export "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$dbName" "$file"
 
-        if [ -f "$file" ]; then
-            #check file size
-            file.size.readable size "$file"
-
-            log.success "DONE $file ($size)"
-        else
+        if [ ! -f "$file" ]; then
             log.error "Problem with export"
             exit 1
         fi
+
+        #check file size
+        file.size.readable size "$file"
+
+        log.success "DONE $file ($size)"
     else
         #export from remote server
         #remote value is not localhost ask for server
@@ -163,7 +166,7 @@ function database_export() {
             exit 1
         fi
 
-        log.info "Exporting remote DB $1 from $remote"
+        log.info "Exporting remote DB $dbName from $remote"
 
         if ! mysql.remote.request_auth; then
             log.warning "Invalid authentification"
@@ -172,7 +175,7 @@ function database_export() {
 
         timer.start
 
-        mysql.remote.export "$file" "$remote" "$port" "$REMOTE_SSH_USER" "$1" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD" "$remoteArg"
+        mysql.remote.export "$file" "$remote" "$port" "$REMOTE_SSH_USER" "$dbName" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD" "$remoteArg"
 
         #check file size
         file.size.readable size "$file"
@@ -181,18 +184,16 @@ function database_export() {
         if [[ "$size" == 0* ]]; then
             log.error "Error"
             exit 1
-        else
-            log.success "DONE $file ($size) ($(timer.end)s)"
         fi
+
+        log.success "DONE $file ($size) ($(timer.end)s)"
     fi
 }
 
 function database_import() {
-    local file realfile remoteArg
+    local file remoteArg
     local remote="localhost"
     local port=22
-
-    log.header "Import database $1"
 
     #opts
     POSITIONAL=()
@@ -208,7 +209,11 @@ function database_import() {
     #restore positional parameters
     set -- "${POSITIONAL[@]}"
 
-    if [[ -z $1 ]]; then
+    local dbName=$1
+
+    log.header "Import database $dbName"
+
+    if [[ -z $dbName ]]; then
         log.info "Usage: db i [dbName]"
         log.info "List of existing backups"
 
@@ -218,14 +223,14 @@ function database_import() {
         log.newline
     fi
 
-    helper.request_db_param "$1"
+    helper.request_db_param "$dbName"
     mysql.request_auth
 
     #import from localhost
     if [ "$remote" == "localhost" ]; then
         #if input file is not specified
         if [ -z "$file" ]; then
-            backup.get_backup_dir dir "$1"
+            backup.get_backup_dir dir "$dbName"
 
             #if db dir exist get file from db dir
             if [ -n "$dir" ]; then
@@ -246,28 +251,18 @@ function database_import() {
             file=$(realpath "$file")
         fi
 
-        if [[ $file =~ \.gz$ || $file =~ \.zip$ ]]; then
-            log.info "Unzipping $file"
-        fi
-
-        helper.get_dump realfile "$file"
-
-        if [[ -z $realfile ]]; then
-            log.error "Input file not specified or not found in backup dir $dir"
-            exit 1
-        fi
-
-        if [ ! -f "$realfile" ]; then
-            log.error "File $realfile does not exist"
+        if [ ! -f "$file" ]; then
+            log.error "File $file does not exist"
             exit 1
         fi
 
         file.size.readable size "$file"
 
         #begin import
-        log.info "Importing DB $1 from $file ($size)"
+        log.info "Importing DB $dbName from $file ($size)"
         timer.start
-        mysql.import "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$1" "$realfile"
+
+        mysql.import "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$dbName" "$file"
         log.success "DONE ($(timer.end)s)"
 
     else
@@ -283,7 +278,7 @@ function database_import() {
             exit 1
         fi
 
-        log.info "Importing remote DB $1 from $remote"
+        log.info "Importing remote DB $dbName from $remote"
 
         if ! mysql.remote.request_auth; then
             log.warning "Invalid authentification"
@@ -292,7 +287,7 @@ function database_import() {
 
         timer.start
 
-        if mysql.remote.import "$remote" "$port" "$REMOTE_SSH_USER" "$1" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD" "$remoteArg"; then
+        if mysql.remote.import "$remote" "$port" "$REMOTE_SSH_USER" "$dbName" "$REMOTE_DB_USER" "$REMOTE_DB_PASSWORD" "$remoteArg"; then
             log.success "DONE ($(timer.end)s)"
         else
             log.error "Error"
@@ -343,11 +338,7 @@ function database_copy() {
     log.info "Copying $1 to $2"
 
     #copy using flux
-    if [ -z "$CFG_DB_PASSWORD" ]; then
-        mysqldump --single-transaction -u "$CFG_DB_USER" "$1" | mysql -u "$CFG_DB_USER" "$2"
-    else
-        mysqldump --single-transaction -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$1" | mysql -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$2"
-    fi
+    mysqldump --single-transaction -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$1" | mysql -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$2"
 
     log.success "DONE"
 }
@@ -379,24 +370,11 @@ function database_backup_all() {
 
     today=$(date '+%Y%m%d')
 
-    if [[ -v CFG_DB_USER ]]; then
-        user=$CFG_DB_USER
-    else
-        user=$CFG_DB_BACKUP_USER
-    fi
-
-    if [[ -v CFG_DB_PASSWORD ]]; then
-        pass=$CFG_DB_PASSWORD
-    else
-        pass=$CFG_DB_BACKUP_PASSWORD
-    fi
+    user="${CFG_DB_BACKUP_USER:-$CFG_DB_USER}"
+    pass="${CFG_DB_BACKUP_PASSWORD:-$CFG_DB_PASSWORD}"
 
     #list all database
-    if [[ -n $pass ]]; then
-        dbs="$(mysql -u "$user" -p"$pass" -Bse 'show databases')"
-    else
-        dbs="$(mysql -u "$user" -Bse 'show databases')"
-    fi
+    dbs="$(mysql -u "$user" -p"$pass" -Bse 'show databases')"
 
     dir=$CFG_DB_BACKUP_DIR
 
@@ -422,11 +400,7 @@ function database_backup_all() {
 
             file="${dir}/${CFG_DB_BACKUP_PREFIX}${today}.${db}.sql.gz"
 
-            if [[ -n $pass ]]; then
-                mysqldump --single-transaction --lock-tables=false -u "$user" -p"$pass" "$db" | gzip >"$file"
-            else
-                mysqldump --single-transaction --lock-tables=false -u "$user" "$db" | gzip >"$file"
-            fi
+            mysqldump --single-transaction --lock-tables=false -u "$user" -p"$pass" "$db" | file.gzip --best >"$file"
 
             file.size.readable size "$file"
             log.info ">> $file ($size)"
