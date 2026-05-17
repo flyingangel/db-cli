@@ -14,7 +14,7 @@ function mysql.remote.export() {
 
     set -o pipefail
 
-    ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction --routines --events -u $db_user -p$db_pass $db_name | { command -v pigz >/dev/null && pigz --best || gzip --best }" >"$file"
+    ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction --routines --events -u $db_user -p$db_pass $db_name | (command -v pigz >/dev/null && pigz --best || gzip --best)" >"$file"
 
     #shellcheck disable=SC2181
     [[ $? -eq 0 ]] || return 1
@@ -41,7 +41,7 @@ function mysql.remote.import() {
     mysql.create "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$db_name"
 
     #import from remote server
-    ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction --routines --events -u $db_user -p$db_pass $db_name | { command -v pigz >/dev/null && pigz --best || gzip --best }" | file.unzip | mysql -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$db_name"
+    ssh -p "$port" "$ssh_user@$ip" "mysqldump $args --single-transaction --routines --events -u $db_user -p$db_pass $db_name | (command -v pigz >/dev/null && pigz --best || gzip --best)" | file.gunzip | mysql -u "$CFG_DB_USER" -p"$CFG_DB_PASSWORD" "$db_name"
 
     #shellcheck disable=SC2181
     [[ $? -eq 0 ]] || return 1
@@ -69,48 +69,4 @@ function mysql.remote.request_auth() {
     if [[ -z $REMOTE_SSH_USER || -z $REMOTE_DB_USER || -z $REMOTE_DB_PASSWORD ]]; then
         return 1
     fi
-}
-
-#return a chosen server IP
-#mysql.remote.ask_server result_ip
-function mysql.remote.ask_server() {
-    local input ip list i host hostList
-
-    list=$(printf '%s' "$(cat /etc/hosts)" | awk -F "\\\s+" '{print $1"\t"$2}')
-    i=1
-    hostList=()
-
-    log.header "$(printf '%s\t%-16s\t%s\n' '#' 'IP' 'Host')"
-
-    while read -r line; do
-        #test for valid IP
-        if [[ $line =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-            ip=$(printf '%s' "$line" | awk -F "\t" '{print $1}')
-            host=$(printf '%s' "$line" | awk -F "\t" '{print $2}')
-
-            if [[ $ip == "127.0.0.1" ]]; then
-                continue
-            fi
-
-            printf '%s\t%-16s\t%s\n' "$i" "$ip" "$host"
-
-            hostList+=("$ip")
-            ((i++))
-        fi
-    done < <(echo "$list")
-
-    log.newline
-
-    read -rp "Choose a server number: " input
-
-    #test if is a number
-    if ! [[ "$input" =~ ^[0-9]+$ ]]; then
-        log.error "Invalid number"
-        exit 1
-    fi
-
-    [[ $input -ge 0 ]] && ((input--))
-    host="${hostList[$input]}"
-
-    eval "$1=$host"
 }

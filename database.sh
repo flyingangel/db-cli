@@ -157,7 +157,7 @@ function database_export() {
         #remote value is not localhost ask for server
         if [ "$remote" == "--remote" ]; then
             log.newline
-            mysql.remote.ask_server remote
+            host.ask remote
             log.newline
         fi
 
@@ -264,12 +264,11 @@ function database_import() {
 
         mysql.import "$CFG_DB_USER" "$CFG_DB_PASSWORD" "$dbName" "$file"
         log.success "DONE ($(timer.end)s)"
-
     else
         #remote value is not localhost ask for server
         if [ "$remote" == "--remote" ]; then
             log.newline
-            mysql.remote.ask_server remote
+            host.ask remote
             log.newline
         fi
 
